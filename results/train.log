@@ -1,0 +1,67 @@
+V=20001 train chunks 58593 val chunks 1178 device mps
+params 6.848801 M
+step 200 2% loss 6.399 lr 0.00199 t 57s
+step 400 5% loss 6.173 lr 0.00199 t 111s
+step 600 7% loss 6.263 lr 0.00198 t 162s
+step 800 9% loss 5.972 lr 0.00196 t 210s
+step 1000 11% loss 5.545 lr 0.00194 t 260s
+step 1200 13% loss 6.091 lr 0.00192 t 308s
+step 1400 15% loss 5.893 lr 0.00190 t 349s
+  val nll 5.758 ppl 316.6 (8.31 bits/word)
+step 1600 17% loss 5.751 lr 0.00187 t 399s
+step 1800 19% loss 5.475 lr 0.00184 t 448s
+step 2000 20% loss 5.659 lr 0.00181 t 489s
+step 2200 22% loss 5.715 lr 0.00178 t 529s
+step 2400 24% loss 5.689 lr 0.00174 t 568s
+step 2600 25% loss 5.466 lr 0.00171 t 607s
+step 2800 27% loss 5.537 lr 0.00167 t 645s
+step 3000 28% loss 5.605 lr 0.00164 t 684s
+  val nll 5.483 ppl 240.5 (7.91 bits/word)
+step 3200 30% loss 5.345 lr 0.00159 t 729s
+step 3400 32% loss 5.529 lr 0.00155 t 767s
+step 3600 34% loss 5.535 lr 0.00151 t 806s
+step 3800 35% loss 5.408 lr 0.00146 t 845s
+step 4000 37% loss 5.378 lr 0.00142 t 885s
+step 4200 39% loss 4.832 lr 0.00137 t 925s
+step 4400 40% loss 5.561 lr 0.00132 t 965s
+  val nll 5.328 ppl 206.0 (7.69 bits/word)
+step 4600 42% loss 5.712 lr 0.00127 t 1012s
+step 4800 44% loss 5.291 lr 0.00122 t 1053s
+step 5000 46% loss 5.126 lr 0.00117 t 1092s
+step 5200 47% loss 5.166 lr 0.00112 t 1132s
+step 5400 49% loss 5.051 lr 0.00107 t 1170s
+step 5600 50% loss 5.360 lr 0.00102 t 1210s
+step 5800 52% loss 5.094 lr 0.00097 t 1249s
+step 6000 54% loss 5.269 lr 0.00092 t 1288s
+  val nll 5.232 ppl 187.2 (7.55 bits/word)
+step 6200 56% loss 5.188 lr 0.00086 t 1334s
+step 6400 57% loss 5.098 lr 0.00081 t 1373s
+step 6600 59% loss 4.910 lr 0.00076 t 1412s
+step 6800 61% loss 4.917 lr 0.00072 t 1453s
+step 7000 62% loss 5.266 lr 0.00067 t 1492s
+step 7200 64% loss 5.537 lr 0.00062 t 1533s
+step 7400 66% loss 5.069 lr 0.00058 t 1573s
+  val nll 5.162 ppl 174.4 (7.45 bits/word)
+step 7600 67% loss 5.147 lr 0.00053 t 1618s
+step 7800 69% loss 5.367 lr 0.00048 t 1658s
+step 8000 71% loss 4.807 lr 0.00044 t 1698s
+step 8200 72% loss 4.883 lr 0.00040 t 1738s
+step 8400 74% loss 5.073 lr 0.00036 t 1778s
+step 8600 76% loss 5.270 lr 0.00033 t 1817s
+step 8800 77% loss 5.114 lr 0.00030 t 1856s
+step 9000 79% loss 5.101 lr 0.00026 t 1895s
+  val nll 5.128 ppl 168.7 (7.40 bits/word)
+step 9200 81% loss 5.068 lr 0.00023 t 1939s
+step 9400 82% loss 4.874 lr 0.00020 t 1978s
+step 9600 84% loss 5.071 lr 0.00018 t 2017s
+step 9800 86% loss 4.913 lr 0.00016 t 2056s
+step 10000 87% loss 5.235 lr 0.00014 t 2095s
+step 10200 89% loss 5.091 lr 0.00012 t 2134s
+step 10400 91% loss 4.817 lr 0.00010 t 2173s
+  val nll 5.108 ppl 165.4 (7.37 bits/word)
+step 10600 92% loss 5.146 lr 0.00009 t 2217s
+step 10800 94% loss 5.008 lr 0.00008 t 2256s
+step 11000 96% loss 5.126 lr 0.00007 t 2294s
+step 11200 97% loss 5.199 lr 0.00006 t 2333s
+step 11400 99% loss 5.261 lr 0.00006 t 2372s
+FINAL val nll 5.103 ppl 164.4 (7.36 bits/word)
