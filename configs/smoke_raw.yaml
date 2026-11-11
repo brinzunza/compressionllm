@@ -1,0 +1,3 @@
+extends: smoke.yaml
+compressor:
+  kind: identity

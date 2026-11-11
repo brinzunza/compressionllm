@@ -1,0 +1,7 @@
+# Fixed rule, but words the decoder would get wrong are escaped, so the stream is lossless.
+extends: base.yaml
+compressor:
+  kind: rule
+  rule: vowel_drop
+  verify: true
+  tau: 0.1

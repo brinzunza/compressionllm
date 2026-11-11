@@ -1,0 +1,5 @@
+extends: smoke.yaml
+compressor:
+  kind: rule
+  rule: vowel_drop
+  verify: false

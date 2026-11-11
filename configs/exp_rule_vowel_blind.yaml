@@ -1,0 +1,6 @@
+# Fixed compression: drop non-initial vowels, applied blindly (lossy where the decoder guesses wrong).
+extends: base.yaml
+compressor:
+  kind: rule
+  rule: vowel_drop
+  verify: false

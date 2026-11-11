@@ -1,0 +1,50 @@
+# Shared defaults. Experiment configs `extends: base.yaml` and override what differs.
+# Sized for a single consumer/cloud GPU; scale with `-s key=value` or the vm_* overrides in the README.
+seed: 0
+artifacts_dir: artifacts     # shared, cached stage outputs (decoder LM, compressed corpora, tokenizers)
+runs_dir: runs               # per-experiment results (metrics.json, samples.json, model/)
+
+data:                        # text8 (17M words): train = first N, val = next N, test = last N
+  dir: data
+  n_train_words: 15000000
+  n_val_words: 100000
+  n_test_words: 300000
+
+decoder_lm:                  # word-level LSTM prior used by the learned/rule decoders
+  vocab_size: 20000
+  max_word_len: 12
+  chunk: 256                 # context is reset every `chunk` words (enables parallel enc/dec)
+  emb: 256
+  hid: 512
+  batch: 32
+  lr: 0.002
+  budget_minutes: 25         # or set `steps: N` for a fixed step count
+  eval_every: 1500
+
+compressor:
+  kind: identity
+
+tokenizer:
+  kind: bpe                  # bpe | unigram | wordlevel
+  vocab_size: 8000
+  min_frequency: 2
+
+llm:                         # GPT-2 style decoder-only transformer
+  n_layer: 6
+  n_head: 6
+  n_embd: 384
+  ctx: 512
+  batch_size: 32
+  grad_accum: 1
+  lr: 0.0006
+  weight_decay: 0.1
+  precision: auto            # bf16 where supported, else fp16, else fp32
+  budget:                    # keep identical across experiments you want to compare
+    mode: tokens             # tokens (~equal FLOPs) | orig_chars (equal text seen) | flops
+    value: 100000000
+  eval_every: 500
+  eval_tokens: 500000
+
+bench:                       # inference benchmark settings
+  prompt_tokens: 32
+  gen_tokens: 128

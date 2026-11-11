@@ -1,0 +1,6 @@
+# Learned, context-aware compression: shortest letter subsequence the decoder LM still resolves.
+extends: base.yaml
+compressor:
+  kind: learned
+  tau: 0.1                   # logit margin; larger = safer, less compression
+  workers: 0                 # >0: CPU worker processes for the encoder search (Linux, fork)

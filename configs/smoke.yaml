@@ -1,0 +1,10 @@
+# Tiny end-to-end run (a few minutes on a laptop CPU/GPU) to check the pipeline works.
+extends: base.yaml
+artifacts_dir: artifacts_smoke
+runs_dir: runs_smoke
+data: {n_train_words: 400000, n_val_words: 20000, n_test_words: 20000}
+decoder_lm: {vocab_size: 3000, emb: 64, hid: 128, batch: 16, steps: 300, eval_every: 150}
+compressor: {kind: learned, tau: 0.1}
+tokenizer: {kind: bpe, vocab_size: 1000}
+llm: {n_layer: 2, n_head: 2, n_embd: 128, ctx: 128, batch_size: 16, budget: {mode: tokens, value: 1500000}, eval_every: 100, eval_tokens: 50000}
+bench: {prompt_tokens: 16, gen_tokens: 48, overhead_words: 2048}

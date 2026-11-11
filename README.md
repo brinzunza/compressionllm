@@ -1,64 +1,131 @@
 # compressionllm
 
-Lossless text compression by **dropping letters and letting a language model put them back**.
+Does training a language model on **learned, context-aware letter-dropping compression** make it
+cheaper without making it worse?
 
-Each word is replaced by a short subsequence of its letters (first letter always kept), for example
-`unique` → `uiqu`. A decoder looks at the previously decoded words and picks the most likely
-vocabulary word consistent with the abbreviation. The encoder runs a copy of the decoder, so it
-knows exactly which letters are safe to drop: for every word it keeps the shortest abbreviation
-that still decodes to the true word. If none works, the word is stored in full with a `#` prefix.
+The idea: replace each word by a short subsequence of its letters (`unique` → `uiqu`), and let a
+language model put the letters back using the surrounding words. The encoder can drop more letters
+where the context makes the word predictable (`the` → `t`) and fewer where it doesn't. If the
+compressed text has fewer tokens per character, a model trained directly on it should need fewer
+FLOPs per unit of text, at the cost of running a compressor and decompressor.
 
-Because the decoder is deterministic and sees only already-decoded words, the round trip is exact.
+This repo is a modular pipeline for testing that claim end to end, with matched budgets:
 
-## Results
-
-Corpus: [text8](http://mattmahoney.net/dc/textdata.html) (first 90M characters for training,
-held-out text after that for testing). Vocabulary: 20,000 most frequent words; other words are escaped.
-
-| decoder | test words | raw chars | zlib -9 | xz -9 |
-|---|---|---|---|---|
-| bigram + unigram (`abbrev.py`) | 300,000 | −38% | −18% | −9% |
-| 6.8M-param LSTM (`neural_abbrev.py`) | 51,200 | −40% | −18% | −13% |
-
-Neural run: 0 round-trip mismatches, 14.2% of words escaped (6.6% are out of vocabulary),
-mean 3.55 characters per word vs 5.94 originally. Sizes are for the abbreviated text compared with the
-original text under the same compressor; the model itself (27 MB) is not counted.
-
-**The main finding is a negative one.** Characters saved overstate the storage saved: abbreviated text
-is denser, so a general-purpose compressor finds less to squeeze. And the same LSTM used as an
-arithmetic coder would do better than letter-dropping: its ideal code length on the test text is
-about 64.7 KB against 78.7 KB for abbreviation + xz and 90.8 KB for xz alone (about −29% vs xz).
-That figure is computed from the model's probabilities, not produced by a real arithmetic coder, and it
-spells out-of-vocabulary words at a flat log2(27) bits per character. Exact numbers will vary with
-the training run.
-
-## How it works
-
-- `abbrev.py` – baseline. Interpolated bigram/unigram decoder; the encoder searches subsequences
-  shortest-first. Run: `python3 abbrev.py 300000`.
-- `lm.py`, `train_lm.py` – word-level LSTM language model (embedding 256, hidden 512, tied output
-  embedding). Context is reset every 256 words so chunks can be encoded and decoded in parallel.
-  Training uses a wall-clock budget; the log of the reported run is in `results/train.log`
-  (validation perplexity 164).
-- `neural_abbrev.py` – encoder and decoder. The decoder masks the LM's logits to words containing the
-  abbreviation as a subsequence and takes the argmax. The encoder accepts an abbreviation only if the
-  true word wins by a logit margin `TAU` (default 0.05), so small floating-point differences between
-  batched encoding and step-by-step decoding cannot change the result.
-
-## Reproduce
-
-```bash
-pip install -r requirements.txt
-scripts/get_data.sh                 # downloads and checksums text8 into data/
-python3 abbrev.py 300000            # bigram baseline
-mkdir -p models
-python3 train_lm.py 40              # trains for 40 minutes (uses MPS if available), writes models/
-python3 neural_abbrev.py 200 0.05   # 200 chunks of 256 test words, margin 0.05
+```
+text8 ─► compressor ─► tokenizer ─► LLM training ─► decompressor ─► metrics
+          (raw | fixed rule | learned)   (BPE/unigram/word)   (GPT-2 style)   (restores the text)
 ```
 
-## Ideas not tried yet
+## Findings so far
 
-- A trained encoder that imitates the search (the current encoder searches at encode time).
-- Choosing abbreviations to minimise bits under the model rather than characters.
-- A real arithmetic coder driven by the same LM, as the proper baseline.
-- A character-aware decoder to reduce the 6.6% of out-of-vocabulary words.
+Earlier prototype (kept in git history at `5fa8ba2`; 300k held-out words, bigram decoder, then a
+6.8M-parameter LSTM decoder):
+
+| decoder | raw characters | xz size |
+|---|---|---|
+| bigram | −38% | −9% |
+| LSTM | −40% | −13% |
+
+Characters saved overstate storage saved, because the abbreviated text is denser and a generic
+compressor finds less to squeeze. Whether the saving survives tokenization and LLM training is what this
+pipeline measures; no results for that yet. Treat every number from a run as one seed at small scale.
+
+## Quick start (GPU VM)
+
+```bash
+git clone https://github.com/brinzunza/compressionllm.git && cd compressionllm
+scripts/setup_vm.sh                 # venv, dependencies, text8 download + checksum, unit tests
+source .venv/bin/activate
+make smoke                          # ~minutes: 3 tiny end-to-end runs + report (checks the whole pipeline)
+make experiments                    # the four real experiments, then runs/REPORT.md
+```
+
+Everything is also available as plain commands:
+
+```bash
+cllm run configs/exp_learned.yaml                  # full pipeline for one config (stages are cached)
+cllm run configs/exp_raw.yaml configs/exp_learned.yaml
+cllm compress configs/exp_learned.yaml             # stop after the compressed corpus
+cllm tokenize configs/exp_learned.yaml             # ...after the tokenizer
+cllm tokenizer-sweep configs/exp_learned.yaml      # grid of tokenizers, compressed vs raw
+cllm encode configs/exp_learned.yaml in.txt out.txt   # compress your own text (lowercase words)
+cllm decode configs/exp_learned.yaml out.txt back.txt
+cllm report                                        # runs/REPORT.md + runs/report.csv
+cllm run configs/exp_learned.yaml -s llm.budget.value=300000000 -s llm.n_layer=8   # override anything
+```
+
+Requires Python ≥ 3.10 and a PyTorch build for your GPU (on Linux the default `pip` wheel is the CUDA
+build). The CPU/MPS path works too, only slowly. The GPU code paths (bf16, fused AdamW) are exercised for
+the first time on a CUDA machine, so run `make smoke` first.
+
+## The three stages you iterate on
+
+**1. Compressor** (`src/cllm/compressors/`). Maps words to one token per word and back. Registered kinds:
+
+| kind | what it does | lossless |
+|---|---|---|
+| `identity` | raw text (baseline) | yes |
+| `rule` (`rule: vowel_drop` or `trunc`, `k`) | context-free letter removal, decoded by the LM; `verify: true` escapes words the decoder would get wrong | only with `verify: true` |
+| `learned` | shortest letter subsequence the decoder LM still resolves, with logit margin `tau`; context decides how much to drop | yes (escapes `#word` otherwise) |
+
+To try your own, subclass `Compressor` and `@register("name")` it (see `compressors/base.py`); set
+`needs_lm = True` to reuse the pipeline's word-level LSTM decoder prior.
+
+**2. Training** (`src/cllm/llm.py`). A GPT-2 style transformer (Hugging Face `GPT2LMHeadModel`) trained
+on the token stream. The same config trains the raw and compressed variants. `llm.budget` decides what
+"comparable compute" means: `tokens` (≈ equal FLOPs, the default), `orig_chars` (equal text seen), or
+`flops`.
+
+**3. Decompressor** (same compressor classes). Every evaluation decodes the compressed test stream back
+to text and checks it, and `generate_samples` decompresses what the LLM generates
+(`runs/<name>/samples.json`). Out-of-vocabulary or invalid abbreviations in generated text are kept literal.
+
+## Tokenizer iteration
+
+Tokenizers (`bpe`, `unigram`, `wordlevel`; Hugging Face `tokenizers`) all split on spaces, so word
+boundaries survive. `cllm tokenizer-sweep CONFIG --kinds bpe,unigram --vocab 1000,4000,16000` trains a grid
+on the compressed corpus and on raw text and prints, per tokenizer: tokens per original character and
+word, compressed characters per token, `<unk>` rate, exact round-trip rate, and two cheap proxies for how
+modelable the tokens are (unigram and bigram cross-entropy in bits per **original** character). Rows with
+`unk_rate > 0` or `roundtrip_lines_ok < 1` are lossy and not comparable. Add a new tokenizer kind in
+`src/cllm/tokenizer.py:train_tokenizer`.
+
+## Metrics
+
+Written to `runs/<name>/metrics.json`, tabulated by `cllm report` (with percentage change vs the raw run):
+
+- **Compression**: characters per word, escape rate, token reduction (tokens per original character), classic
+  zlib/bz2/xz sizes of original vs compressed text.
+- **Reconstruction**: lossless flag, word accuracy, character accuracy; by word length.
+- **Language modelling**: test bits per original character (the headline), perplexity per token, bits per word,
+  and a validation curve against steps, tokens, original characters, FLOPs and wall time (`llm.curve`).
+- **Cost**: analytic FLOPs for decoder-LM training, corpus compression and LLM training (summed into
+  `total_pipeline`), parameter counts, wall time and tokens/s, peak memory for training and inference.
+- **Inference**: prefill latency, decode ms/token with KV cache, and the full per-1k-original-characters cost
+  including compress and decompress time.
+
+Notes on reading them: bits per original character is only a valid cross-pipeline number for lossless
+runs. The decoder LM's own size and training cost are reported but not folded into the bpc. FLOPs are analytic
+estimates (Kaplan-style, see `flops.py`), not profiler counts.
+
+## Reproducibility and caveats
+
+- The encoder simulates the decoder, so encoder and decoder must produce the same logits. Both run in fp32
+  with TF32 disabled and `tau` (default 0.1) adds a safety margin, but decoding on different hardware or
+  PyTorch versions is not guaranteed. Every run verifies a full decode of the test stream.
+- Context resets every 256 words (`decoder_lm.chunk`), which lets chunks be encoded and decoded in parallel.
+- Encoding is a Python search; `compressor.workers: N` runs it in N CPU processes (Linux).
+- Single seed, small models, one corpus (text8: lowercase letters and spaces). Differences of a few percent are
+  within noise until repeated with several seeds.
+
+## Layout
+
+```
+configs/      base.yaml, exp_*.yaml (raw / fixed / learned), smoke*.yaml (tiny)
+src/cllm/     data, word_lm, compressors/, tokenizer, llm, evaluate, bench, pipeline, report, cli
+tests/        unit tests (pytest): rules, codec losslessness, tokenizers, eval bookkeeping
+scripts/      setup_vm.sh, get_data.sh
+results/      training log of the earlier prototype
+artifacts/    (generated) cached decoder LMs, compressed corpora, tokenizers
+runs/         (generated) per-experiment metrics, samples, model weights
+```

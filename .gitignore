@@ -1,5 +1,12 @@
 __pycache__/
 *.pyc
+*.egg-info/
+.venv/
+.pytest_cache/
+.DS_Store
 data/
 models/
-.DS_Store
+artifacts/
+artifacts_smoke/
+runs/
+runs_smoke/

@@ -1,0 +1,4 @@
+# Baseline: standard LLM on uncompressed text.
+extends: base.yaml
+compressor:
+  kind: identity
