@@ -1,0 +1,7 @@
+# Word-level tokens (16k most frequent words, one token each) + sub-word fallback for the rest. No phrases.
+extends: exp_raw.yaml
+tokenizer:
+  kind: phrase
+  params: {words: 16000, phrases: 0, fallback: 1000}
+llm:
+  budget: {mode: orig_chars, value: 463000000}

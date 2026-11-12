@@ -61,6 +61,22 @@ def main(argv=None):
                         with_raw=not a.no_raw, max_lines=a.max_lines)
     p.set_defaults(fn=sweep_fn)
 
+    p = sub.add_parser("phrase-sweep", help="grid over word tokens x phrase tokens x max phrase length (raw text)")
+    _add_cfg(p, force=False)
+    p.add_argument("--words", default="16000", help="comma list: number of whole-word tokens")
+    p.add_argument("--phrases", default="0,4000,16000,32000", help="comma list: number of multi-word tokens (0 = word-level)")
+    p.add_argument("--max-n", default="3,4", help="comma list: longest phrase in words")
+    p.add_argument("--bpe-ref", default="8000,32000", help="comma list of BPE vocab sizes to compare against ('' = none)")
+    p.add_argument("--min-count", type=int, default=20)
+    p.add_argument("--max-lines", type=int, default=100_000, help="training lines (64 words each)")
+
+    def phrase_fn(a):
+        from .pipeline import phrase_sweep
+        ints = lambda v: [int(x) for x in v.split(",") if x]
+        phrase_sweep(_cfg(a), ints(a.words), ints(a.phrases), ints(a.max_n), ints(a.bpe_ref),
+                     min_count=a.min_count, max_lines=a.max_lines)
+    p.set_defaults(fn=phrase_fn)
+
     for name, help_ in [("encode", "compress a text file (space-separated lowercase words)"),
                         ("decode", "decompress a file produced by `encode`")]:
         p = sub.add_parser(name, help=help_)

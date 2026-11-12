@@ -1,0 +1,9 @@
+# Control for the phrase tokenizers: plain BPE at a vocabulary as large as theirs, on raw text.
+# Budget = equal ORIGINAL characters seen (463M, what exp_raw saw), so bits per character is directly
+# comparable and the compute saving shows up in the FLOPs columns. Needs no compression stage.
+extends: exp_raw.yaml
+tokenizer:
+  kind: bpe
+  vocab_size: 32000
+llm:
+  budget: {mode: orig_chars, value: 463000000}

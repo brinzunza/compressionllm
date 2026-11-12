@@ -106,6 +106,26 @@ compressed corpora and decoder LM cached by the BPE experiments. With the defaul
 every run gets the same compute, so a compressed run sees more original text for it; compare `test bpc` (per
 original character) and set `mode: orig_chars` to also match text seen.
 
+**Word and multi-word tokens (`kind: phrase`).** A hybrid tokenizer in `src/cllm/phrase_tokenizer.py`: the most
+frequent *phrases* of 2..`max_n` words get one token each ("of the", "one of the"), the top `words` words get one
+token, and every other word is spelled with WordPiece-style fallback pieces that always include every single
+character (nothing becomes `<unk>`). Only a fraction of all multi-word combinations get a token: n-grams are
+counted over in-vocabulary words, ranked by count x (n-1) (tokens saved if used), and a pool of
+`pool_factor x phrases` is pruned to the `phrases` that the greedy encoder actually uses most on 3M training
+words, because overlapping candidates cannibalise each other. Parameters go under `tokenizer.params`
+(`words`, `phrases`, `max_n`, `fallback`, `min_count`, `pool_factor`, `refine_words`). Letter-dropping
+compressors are not used here (`compressor: identity`).
+
+```bash
+make phrase-sweep          # tokens/word, tokens/char and token sources for a grid of (words, phrases, max_n) next to BPE 8k/32k. CPU only, minutes
+make phrase-experiments    # trains exp_bpe32k, exp_word, exp_phrase_small, exp_phrase at equal original characters seen
+```
+The experiment configs match the budget on **original characters seen** (463M, as `exp_raw`), so `test bpc` is
+directly comparable and the compute saving appears in the FLOPs and `train s` columns. `exp_bpe32k` is the
+control: a plain BPE with the same vocabulary size as `exp_phrase`, since a bigger vocabulary alone already
+lowers tokens per character. A larger vocabulary also makes the output layer more expensive (counted in the
+analytic FLOPs).
+
 ## Metrics
 
 Written to `runs/<name>/metrics.json`, tabulated by `cllm report` (with percentage change vs the raw run):

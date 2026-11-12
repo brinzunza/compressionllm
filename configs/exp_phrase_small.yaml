@@ -1,0 +1,7 @@
+# 16k word tokens + the 4k best multi-word phrases (up to 3 words) + sub-word fallback.
+extends: exp_raw.yaml
+tokenizer:
+  kind: phrase
+  params: {words: 16000, phrases: 4000, max_n: 3, fallback: 1000, min_count: 20}
+llm:
+  budget: {mode: orig_chars, value: 463000000}

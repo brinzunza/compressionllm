@@ -14,7 +14,6 @@ from pathlib import Path
 import numpy as np
 import torch
 import yaml
-from tokenizers import Tokenizer
 
 from .bench import generate_samples, inference_bench
 from .compressors import build_compressor
@@ -23,7 +22,8 @@ from .data import load_words, n_chars
 from .evaluate import compression_report
 from .flops import gpt_train_flops_per_token
 from .llm import bits_per_char, eval_nll, train_llm
-from .tokenizer import encode_words, sweep, tokenizer_report, to_lines, train_tokenizer
+from .phrase_tokenizer import PhraseTokenizer
+from .tokenizer import (encode_words, load_tokenizer, sweep, tokenizer_report, to_lines, train_tokenizer)
 from .utils import get_device, hardware_info, log, set_seed
 from .word_lm import train_word_lm
 
@@ -160,7 +160,7 @@ class Experiment:
             lines = lines[: tcfg["max_train_lines"]]
         log(f"[tokenizer] training {tcfg['kind']} vocab {tcfg['vocab_size']} on {len(lines):,} lines")
         t0 = time.time()
-        tok = train_tokenizer(lines, tcfg["kind"], tcfg["vocab_size"], tcfg.get("min_frequency", 2))
+        tok = train_tokenizer(lines, tcfg["kind"], tcfg["vocab_size"], tcfg.get("min_frequency", 2), tcfg.get("params"))
         secs = time.time() - t0
         tok.save(str(d / "tokenizer.json"))
         ids = {s: encode_words(tok, toks[s]) for s in toks}
@@ -206,7 +206,7 @@ class Experiment:
                  "scored_tokens": cnt}
 
         comp = self.compressor()
-        tok = Tokenizer.from_file(str(tdir / "tokenizer.json"))
+        tok = load_tokenizer(tdir / "tokenizer.json")
         test_comp = _read_tokens(cdir / "test.txt")
         bench = inference_bench(model, comp, ids["test"], test_comp, n_chars(w["test"]), n_test_words,
                                 lcfg["ctx"], device, **self.cfg.get("bench", {}))
@@ -271,4 +271,44 @@ def tokenizer_sweep(cfg, kinds, vocab_sizes, with_raw=True, max_lines=100_000):
         lines_md.append("| " + " | ".join(f"{r[c]:.4g}" if isinstance(r[c], float) else str(r[c]) for c in cols) + " |")
     Path(str(out) + ".md").write_text("\n".join(lines_md) + "\n")
     print("\n".join(lines_md))
+    return rows
+
+
+def phrase_sweep(cfg, words, phrases, max_ns, bpe_ref=(), min_count=20, fallback=1000, max_lines=100_000):
+    """Grid over (word tokens x phrase tokens x max phrase length) on the RAW text, next to BPE references.
+    Reports tokens per original word / character, where the tokens come from, and the bigram proxy."""
+    exp = Experiment(cfg)
+    w = exp.words
+    oc, ow = n_chars(w["test"]), len(w["test"])
+    lines = to_lines(w["train"], LINE_WORDS)[:max_lines]
+    used = w["train"][: len(lines) * LINE_WORDS]
+    specs = [("bpe", {"vocab_size": v}) for v in bpe_ref]
+    specs += [("phrase", {"words": a, "phrases": b, "max_n": n})
+              for a in words for b in phrases for n in (max_ns if b > 0 else max_ns[:1])]
+    rows = []
+    for kind, p in specs:
+        t0 = time.time()
+        if kind == "bpe":
+            tok = train_tokenizer(lines, "bpe", p["vocab_size"])
+            label = f"bpe-{p['vocab_size']}"
+        else:
+            tok = PhraseTokenizer.fit(lines, fallback=fallback, min_count=min_count, **p)
+            label = f"words{p['words']}+phrases{p['phrases']}(n<={p['max_n']})"
+        secs = time.time() - t0
+        tr_ids, te_ids = encode_words(tok, used), encode_words(tok, w["test"])
+        rep = tokenizer_report(tok, tr_ids, te_ids, w["test"], oc, ow)
+        rows.append({"tokenizer": label, "fit_seconds": secs, "epoch_tokens_M": len(tr_ids) / 1e6, **rep})
+        log(f"[phrase-sweep] {label}: vocab {rep['vocab_size']}, {rep['tokens_per_orig_word']:.3f} tokens/word")
+    out = exp.runs / f"{exp.name}_phrase_sweep"
+    exp.runs.mkdir(parents=True, exist_ok=True)
+    _write_json(str(out) + ".json", rows)
+    cols = ["tokenizer", "vocab_size", "tokens_per_orig_word", "tokens_per_orig_char", "token_frac_phrase",
+            "token_frac_fallback_init", "unk_rate", "roundtrip_lines_ok", "bigram_bits_per_char", "epoch_tokens_M",
+            "fit_seconds"]
+    md = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+    for r in rows:
+        md.append("| " + " | ".join(f"{r.get(c, '-'):.4g}" if isinstance(r.get(c), float) else str(r.get(c, "-"))
+                                    for c in cols) + " |")
+    Path(str(out) + ".md").write_text("\n".join(md) + "\n")
+    print("\n".join(md))
     return rows

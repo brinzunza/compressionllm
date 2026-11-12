@@ -53,7 +53,7 @@ def test_tokenizer_roundtrip(kind):
     tok = train_tokenizer(to_lines(words), kind, 100, min_frequency=1)
     assert roundtrip_rate(tok, words, n_lines=50) == 1.0
     ids = encode_words(tok, words)
-    assert ids.dtype == np.uint16 and len(ids) >= len(words) / 2
+    assert ids.dtype == np.uint16 and (kind == "phrase" or len(ids) >= len(words) / 2)
 
 
 def test_ngram_proxy_prefers_predictable_streams():
@@ -80,3 +80,44 @@ def test_unique_codec_is_lossless_and_only_drops_unambiguous_letters():
     for w, t in c.enc.items():
         if t != w:
             assert sum(t in set(subseq_candidates(v)) for v in c.enc) == 1
+
+
+def _phrase_corpus(n=3000, seed=0):
+    rng = np.random.default_rng(seed)
+    common = ["the", "of", "and", "in", "city", "river", "king", "war"]
+    rare = ["zoology", "quasar", "xylophone", "mnemonic"]
+    out = []
+    while len(out) < n:
+        out += ["one", "of", "the", "best"] if rng.random() < 0.4 else [common[rng.integers(8)]]
+        if rng.random() < 0.05:
+            out.append(rare[rng.integers(4)])
+    return out[:n]
+
+
+def test_phrase_tokenizer_roundtrip_phrases_fallback_and_save(tmp_path):
+    from cllm.phrase_tokenizer import K_PHRASE, PhraseTokenizer
+    words = _phrase_corpus()
+    lines = to_lines(words)
+    tok = PhraseTokenizer.fit(lines, words=12, phrases=5, max_n=3, fallback=30, min_count=5, verbose=False)
+    assert ("one", "of", "the") in tok.phrase_id or ("of", "the") in tok.phrase_id   # the planted phrase is found
+    for kind_words in (words[:200], ["zoology", "unseenword", "of", "the", "quasar"]):    # incl. rare + unseen words
+        line = " ".join(kind_words)
+        ids = tok.encode(line).ids
+        assert tok.decode(ids) == line
+    ids = encode_words(tok, words)
+    assert len(ids) < 0.9 * len(words)                                   # multi-word tokens cut the token count
+    assert (tok.kind[ids] == K_PHRASE).any()
+    assert roundtrip_rate(tok, words, n_lines=40) == 1.0
+    tok.save(tmp_path / "t.json")
+    from cllm.tokenizer import load_tokenizer
+    t2 = load_tokenizer(tmp_path / "t.json")
+    assert t2.get_vocab_size() == tok.get_vocab_size() and list(encode_words(t2, words[:300])) == list(encode_words(tok, words[:300]))
+
+
+def test_phrase_tokenizer_with_zero_phrases_is_word_level_plus_fallback():
+    from cllm.phrase_tokenizer import PhraseTokenizer
+    words = _phrase_corpus()
+    tok = PhraseTokenizer.fit(to_lines(words), words=8, phrases=0, max_n=3, fallback=30, verbose=False)
+    assert tok.phrases == [] and tok.decode(tok.encode("the zoology of king").ids) == "the zoology of king"
+    ids = encode_words(tok, ["the", "of", "king"])
+    assert len(ids) == 3                                                  # one token per in-vocabulary word

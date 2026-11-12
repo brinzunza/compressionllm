@@ -1,4 +1,4 @@
-.PHONY: setup data test smoke experiments char-experiments report
+.PHONY: setup data test smoke experiments char-experiments phrase-sweep phrase-experiments report
 setup:
 	scripts/setup_vm.sh
 data:
@@ -14,5 +14,10 @@ experiments:
 char-experiments:
 	cllm run configs/exp_char_raw.yaml configs/exp_char_unique.yaml configs/exp_char_rule_vowel_verified.yaml configs/exp_char_learned.yaml
 	cllm report
+phrase-sweep:
+	cllm phrase-sweep configs/exp_raw.yaml
+phrase-experiments:
+	cllm run configs/exp_bpe32k.yaml configs/exp_word.yaml configs/exp_phrase_small.yaml configs/exp_phrase.yaml
+	cllm report --baseline exp_raw
 report:
 	cllm report

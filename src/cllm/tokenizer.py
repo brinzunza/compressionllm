@@ -6,6 +6,7 @@ decodes back to exactly the space-joined word stream.
   bpe       byte-pair encoding over characters (Metaspace pre-tokenizer)
   unigram   unigram LM tokenizer (Metaspace)
   wordlevel one token per distinct compressed word (rare words -> <unk>, which is lossy)
+  phrase    hybrid: frequent multi-word phrases + whole words + sub-word fallback (phrase_tokenizer.py)
   char      one token per character (vocab = the ~30 characters seen in training). Here the sequence
             length equals the compressed character count, so letter dropping shortens sequences
             one for one, unlike with BPE where it mostly just fragments the tokens.
@@ -15,8 +16,10 @@ import time
 import numpy as np
 from tokenizers import Regex, Tokenizer, decoders, models, normalizers, pre_tokenizers, trainers
 
+from .phrase_tokenizer import PhraseTokenizer
+
 SPECIALS = ["<unk>", "<eos>"]
-KINDS = ("bpe", "unigram", "wordlevel", "char")
+KINDS = ("bpe", "unigram", "wordlevel", "char", "phrase")
 
 
 def to_lines(words, line_words=64):
@@ -33,7 +36,18 @@ def _char_tokenizer(lines):
     return tok
 
 
-def train_tokenizer(lines, kind="bpe", vocab_size=8000, min_frequency=2):
+def load_tokenizer(path):
+    """Load a tokenizer saved by `tok.save(path)` (Hugging Face JSON or a phrase tokenizer)."""
+    with open(path) as f:
+        head = f.read(40)
+    if '"phrase_tokenizer"' in head:
+        return PhraseTokenizer.load(path)
+    return Tokenizer.from_file(str(path))
+
+
+def train_tokenizer(lines, kind="bpe", vocab_size=8000, min_frequency=2, params=None):
+    if kind == "phrase":
+        return PhraseTokenizer.fit(lines, **(params or {}))
     if kind == "char":
         return _char_tokenizer(lines)
     if kind == "bpe":
@@ -126,6 +140,8 @@ def tokenizer_report(tok, train_ids, test_ids, test_words, orig_chars, orig_word
         "roundtrip_lines_ok": roundtrip_rate(tok, test_words),
     }
     rep.update(ngram_proxy_bits(train_ids, test_ids, V, orig_chars))
+    if hasattr(tok, "usage"):
+        rep.update({k: v for k, v in tok.usage(test_ids).items() if not k.startswith("_")})
     return rep
 
 
