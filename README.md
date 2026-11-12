@@ -76,6 +76,13 @@ on the token stream. The same config trains the raw and compressed variants. `ll
 "comparable compute" means: `tokens` (≈ equal FLOPs, the default), `orig_chars` (equal text seen), or
 `flops`.
 
+Multi-GPU: set `llm.gpus: N` (or `all`) and `cllm run` spawns one DDP process per GPU for the training stage
+(`-s llm.gpus=all`). `llm.batch_size` is the *global* batch and is split across GPUs, so the optimization and
+the token budget are identical whatever the GPU count; it must be divisible by `gpus`. Evaluation,
+benchmarks and the decoder-LM/compression stages stay on one device (CPU workers do the encoder search). To use
+a multi-GPU node without DDP, run separate experiments per GPU with `CUDA_VISIBLE_DEVICES=i`, after running
+`cllm compress` once so shared stages are cached.
+
 **3. Decompressor** (same compressor classes). Every evaluation decodes the compressed test stream back
 to text and checks it, and `generate_samples` decompresses what the LLM generates
 (`runs/<name>/samples.json`). Out-of-vocabulary or invalid abbreviations in generated text are kept literal.

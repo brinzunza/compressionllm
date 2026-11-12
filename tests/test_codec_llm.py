@@ -67,3 +67,21 @@ def test_eval_nll_covers_every_token_and_matches_uniform_baseline():
     assert cnt == len(ids) - 1
     assert nats / cnt == pytest.approx(math.log(50), rel=1e-4)
     assert bits_per_char(nats, cnt, 2.0) == pytest.approx(math.log2(50) / 2.0, rel=1e-4)
+
+
+def _tiny_llm_cfg(gpus):
+    return {"ctx": 16, "n_embd": 16, "n_layer": 1, "n_head": 1, "batch_size": 4, "lr": 1e-3, "gpus": gpus,
+            "budget": {"mode": "tokens", "value": 4 * 16 * 10}, "eval_every": 5, "eval_tokens": 200,
+            "precision": "fp32", "seed": 0}
+
+
+@pytest.mark.parametrize("gpus", [1, 2])
+def test_train_llm_single_and_ddp_cpu(tmp_path, gpus):
+    from cllm.llm import load_llm, train_llm
+    ids = np.random.default_rng(0).integers(0, 30, 2000)
+    cfg = _tiny_llm_cfg(gpus)
+    model, stats = train_llm(cfg, ids, ids[:300], 30, 2.0, 2.0, tmp_path, device=torch.device("cpu"))
+    assert stats["world_size"] == gpus and stats["steps"] == 10 and stats["tokens_seen"] == 4 * 16 * 10
+    assert math.isfinite(stats["curve"][-1]["val_bpc"]) and len(stats["curve"]) == 2
+    assert load_llm(tmp_path, "cpu") is not None
+    assert not list(tmp_path.glob("_*"))              # temp files cleaned up

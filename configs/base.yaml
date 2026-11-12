@@ -35,6 +35,7 @@ llm:                         # GPT-2 style decoder-only transformer
   n_embd: 384
   ctx: 512
   batch_size: 32
+  gpus: 1                    # DDP processes: N, or "all" visible GPUs. batch_size is GLOBAL (split across GPUs)
   grad_accum: 1
   lr: 0.0006
   weight_decay: 0.1
