@@ -89,13 +89,22 @@ to text and checks it, and `generate_samples` decompresses what the LLM generate
 
 ## Tokenizer iteration
 
-Tokenizers (`bpe`, `unigram`, `wordlevel`; Hugging Face `tokenizers`) all split on spaces, so word
+Tokenizers (`bpe`, `unigram`, `wordlevel`, `char`; Hugging Face `tokenizers`) all split on spaces, so word
 boundaries survive. `cllm tokenizer-sweep CONFIG --kinds bpe,unigram --vocab 1000,4000,16000` trains a grid
 on the compressed corpus and on raw text and prints, per tokenizer: tokens per original character and
 word, compressed characters per token, `<unk>` rate, exact round-trip rate, and two cheap proxies for how
 modelable the tokens are (unigram and bigram cross-entropy in bits per **original** character). Rows with
 `unk_rate > 0` or `roundtrip_lines_ok < 1` are lossy and not comparable. Add a new tokenizer kind in
 `src/cllm/tokenizer.py:train_tokenizer`.
+
+**Character-level runs.** With BPE, a word is already about 1.3 tokens, so dropping letters mostly fragments
+tokens instead of removing them (measured: `unique` saves 8% of characters but costs +1.5% tokens). With
+`tokenizer.kind: char` every character is a token, so letter dropping shortens sequences one for one. The
+`exp_char_*.yaml` configs (`make char-experiments`) run raw / unique / verified vowel-drop / learned with a
+character-level GPT (context 1024 characters, batch 16 so tokens per step match the BPE runs). They reuse the
+compressed corpora and decoder LM cached by the BPE experiments. With the default `llm.budget.mode: tokens`
+every run gets the same compute, so a compressed run sees more original text for it; compare `test bpc` (per
+original character) and set `mode: orig_chars` to also match text seen.
 
 ## Metrics
 

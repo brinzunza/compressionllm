@@ -1,0 +1,9 @@
+# Character-level LM on raw text: the baseline for the character-level comparison.
+# Same compressed corpora as the BPE experiments (cached by compressor config), only the tokenizer and the
+# LLM context change. ctx 1024 characters ~ 170 words; batch 16 keeps tokens/step and memory the same as base.
+extends: exp_raw.yaml
+tokenizer:
+  kind: char
+llm:
+  ctx: 1024
+  batch_size: 16

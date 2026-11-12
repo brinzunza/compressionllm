@@ -6,21 +6,36 @@ decodes back to exactly the space-joined word stream.
   bpe       byte-pair encoding over characters (Metaspace pre-tokenizer)
   unigram   unigram LM tokenizer (Metaspace)
   wordlevel one token per distinct compressed word (rare words -> <unk>, which is lossy)
+  char      one token per character (vocab = the ~30 characters seen in training). Here the sequence
+            length equals the compressed character count, so letter dropping shortens sequences
+            one for one, unlike with BPE where it mostly just fragments the tokens.
 """
 import time
 
 import numpy as np
-from tokenizers import Tokenizer, decoders, models, pre_tokenizers, trainers
+from tokenizers import Regex, Tokenizer, decoders, models, normalizers, pre_tokenizers, trainers
 
 SPECIALS = ["<unk>", "<eos>"]
-KINDS = ("bpe", "unigram", "wordlevel")
+KINDS = ("bpe", "unigram", "wordlevel", "char")
 
 
 def to_lines(words, line_words=64):
     return [" ".join(words[i:i + line_words]) for i in range(0, len(words), line_words)]
 
 
+def _char_tokenizer(lines):
+    chars = sorted({c for line in lines for c in line} | {" "})
+    vocab = {t: i for i, t in enumerate(SPECIALS + chars)}
+    tok = Tokenizer(models.WordLevel(vocab, unk_token="<unk>"))
+    tok.normalizer = normalizers.Prepend(" ")        # lines are encoded separately; the leading space is the
+    tok.pre_tokenizer = pre_tokenizers.Split(Regex("."), behavior="isolated")   # separator between them
+    tok.decoder = decoders.Sequence([decoders.Fuse(), decoders.Strip(content=" ", left=1, right=0)])
+    return tok
+
+
 def train_tokenizer(lines, kind="bpe", vocab_size=8000, min_frequency=2):
+    if kind == "char":
+        return _char_tokenizer(lines)
     if kind == "bpe":
         tok = Tokenizer(models.BPE(unk_token="<unk>"))
         trainer = trainers.BpeTrainer(vocab_size=vocab_size, special_tokens=SPECIALS,

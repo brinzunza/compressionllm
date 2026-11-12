@@ -1,0 +1,7 @@
+# Character-level LM on learned-compressed text (see exp_char_raw.yaml). Compressed corpus is reused from exp_learned.
+extends: exp_learned.yaml
+tokenizer:
+  kind: char
+llm:
+  ctx: 1024
+  batch_size: 16

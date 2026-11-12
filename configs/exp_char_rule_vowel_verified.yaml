@@ -1,0 +1,7 @@
+# Character-level LM on rule_vowel_verified-compressed text (see exp_char_raw.yaml). Compressed corpus is reused from exp_rule_vowel_verified.
+extends: exp_rule_vowel_verified.yaml
+tokenizer:
+  kind: char
+llm:
+  ctx: 1024
+  batch_size: 16

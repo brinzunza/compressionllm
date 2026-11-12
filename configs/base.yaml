@@ -25,7 +25,7 @@ compressor:
   kind: identity
 
 tokenizer:
-  kind: bpe                  # bpe | unigram | wordlevel
+  kind: bpe                  # bpe | unigram | wordlevel | char
   vocab_size: 8000
   min_frequency: 2
 

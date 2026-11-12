@@ -1,0 +1,7 @@
+# Character-level LM on unique-compressed text (see exp_char_raw.yaml). Compressed corpus is reused from exp_unique.
+extends: exp_unique.yaml
+tokenizer:
+  kind: char
+llm:
+  ctx: 1024
+  batch_size: 16
