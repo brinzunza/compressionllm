@@ -1,0 +1,7 @@
+# Context-free unique abbreviations: drop letters only where no other vocabulary word is a match.
+# No decoder LM is trained; decoding is a dictionary lookup.
+extends: base.yaml
+compressor:
+  kind: unique
+  vocab_size: 20000
+  max_word_len: 12

@@ -1,6 +1,7 @@
 """Compressor registry. `build_compressor({'kind': ..., **params}, lm_dir)` is what the pipeline calls."""
 from .base import Compressor, Identity
 from .lm_codec import LMCodec, RULES
+from .unique import UniqueCodec
 
 REGISTRY = {}
 
@@ -13,6 +14,7 @@ def register(name):
 
 
 register("identity")(Identity)
+register("unique")(UniqueCodec)
 
 
 @register("learned")
@@ -36,4 +38,4 @@ def build_compressor(cfg, lm_dir=None):
     return comp
 
 
-__all__ = ["Compressor", "Identity", "LMCodec", "RULES", "register", "build_compressor", "REGISTRY"]
+__all__ = ["Compressor", "Identity", "LMCodec", "UniqueCodec", "RULES", "register", "build_compressor", "REGISTRY"]

@@ -20,6 +20,11 @@ class Compressor:
     needs_lm = False
     lm_dir = None
 
+    needs_vocab = False          # True: the pipeline calls fit(train_words) before use (builds a vocabulary)
+
+    def fit(self, train_words):
+        return self
+
     def compress(self, words, workers=0, progress=False):
         raise NotImplementedError
 

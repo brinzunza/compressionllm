@@ -96,6 +96,8 @@ class Experiment:
             probe = build_compressor(self._comp_cfg(), None)
             lm_dir = self.stage_decoder_lm() if probe.needs_lm else None
             self._comp = build_compressor(self._comp_cfg(), lm_dir)
+            if self._comp.needs_vocab:
+                self._comp.fit(self.words["train"])
         return self._comp
 
     # ---------------- stage: compressed corpus ----------------

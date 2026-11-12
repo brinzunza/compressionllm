@@ -59,8 +59,11 @@ def build_table(runs):
 
 def relative_to_baseline(runs, baseline=None):
     """Percent change of key metrics vs the identity (raw) run, if there is one."""
-    base = next((m for m in runs if (baseline and m["name"] == baseline) or
-                 (not baseline and m["compressor"].get("kind") == "identity")), None)
+    if baseline:
+        base = next((m for m in runs if m["name"] == baseline), None)
+    else:    # the raw run that saw the most tokens, so short test runs are never the baseline
+        raw = [m for m in runs if m["compressor"].get("kind") == "identity"]
+        base = max(raw, key=lambda m: m["llm"]["tokens_seen"], default=None)
     if base is None:
         return []
     keys = [("test bpc", lambda m: m["eval"]["test_bpc"]),
