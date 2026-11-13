@@ -4,4 +4,6 @@ tokenizer:
   kind: phrase
   params: {words: 16000, phrases: 16000, max_n: 4, fallback: 1000, min_count: 20}
 llm:
+  batch_size: 16      # x grad_accum 2 = same 32 seqs/step as exp_raw; halves the logits memory (33k vocab OOMs an 11.6 GB GPU otherwise)
+  grad_accum: 2
   budget: {mode: orig_chars, value: 463000000}

@@ -6,4 +6,6 @@ tokenizer:
   kind: bpe
   vocab_size: 32000
 llm:
+  batch_size: 16      # x grad_accum 2 = same 32 seqs/step as exp_raw; halves the logits memory (33k vocab OOMs an 11.6 GB GPU otherwise)
+  grad_accum: 2
   budget: {mode: orig_chars, value: 463000000}
